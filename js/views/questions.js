@@ -8,7 +8,7 @@ import { groupBlocks } from './schedule.js';
 
 const PLACE_FIXED = ['レジ', 'サービスカウンター', '店頭', '屋外売場', '資材館', 'バックヤード付近', 'その他'];
 const DEST_FIXED = ['同じ場所', 'レジ', 'サービスカウンター', '店頭', '屋外売場', '資材館', '担当者へ引継ぎ', '不明', 'その他'];
-const TOOLS = ['地図', 'スマホ', 'ハンディ', 'ストコン', '担当者', '上司'];
+const TOOLS = ['地図', 'スマホ', 'ハンディ', 'ストコン', 'DWH', '担当者', '上司'];
 const RESULTS = ['解決', '担当者へ引継ぎ', '未解決'];
 const DISPLAY = [{ label: 'あり', value: 'あり' }, { label: 'なし', value: 'なし' }, { label: '未確認', value: '確認していない' }];
 
@@ -31,6 +31,7 @@ export async function render(el) {
           </div>
           <div class="q-content">${esc(q.content)}</div>
           <div class="muted">案内先: ${esc(placeText(q.destType, q.destAisle, q.destFixed))}</div>
+          ${q.outcome ? `<div class="muted">結末: ${esc(q.outcome)}</div>` : ''}
         </div>`).join('')}
     </div>
     <div class="btn-row">
@@ -66,6 +67,15 @@ export async function startCustomerTimer() {
   toast('対応タイマーを開始しました');
 }
 
+// タイマーを終了して記録フォームを開く(ホームのカード・下部中央ボタン共用)
+export async function endCustomerTimer() {
+  const t = store.getDaily().activeTimer;
+  if (!t) return;
+  const minutes = Math.max(1, Math.round((Date.now() - new Date(t.startedAt).getTime()) / 60000));
+  await store.mutateDaily(d => { d.activeTimer = null; });
+  openQuestionForm({ at: t.startedAt, minutes });
+}
+
 // 質問記録フォーム。prefill: {at, minutes}(タイマー終了から)/ existing: 既存記録の編集
 export function openQuestionForm(prefill = null, existing = null) {
   const q = existing || {
@@ -78,6 +88,7 @@ export function openQuestionForm(prefill = null, existing = null) {
     minutes: (prefill && prefill.minutes) || 0,
     tools: [],
     result: '解決',
+    outcome: '',
   };
   let dirty = false;
 
@@ -105,6 +116,9 @@ export function openQuestionForm(prefill = null, existing = null) {
     <label class="f-label">結果</label>
     <div data-f="result"></div>
 
+    <label class="f-label">結末(任意・自由記入)</label>
+    <textarea data-f="outcome" rows="2" placeholder="例: 在庫なしのため取り寄せを案内した"></textarea>
+
     <label class="f-label">所要時間(分)${prefill && prefill.minutes ? '　※タイマー計測値' : ''}</label>
     <div class="inline-num"><input type="number" inputmode="numeric" min="0" data-f="minutes"><span>分</span></div>
 
@@ -121,6 +135,7 @@ export function openQuestionForm(prefill = null, existing = null) {
 
   const $ = (sel) => m.el.querySelector(sel);
   $('[data-f="content"]').value = q.content;
+  $('[data-f="outcome"]').value = q.outcome || '';
   $('[data-f="minutes"]').value = q.minutes || '';
   const placeAisleIn = $('[data-f="placeAisle"]');
   const destAisleIn = $('[data-f="destAisle"]');
@@ -168,6 +183,7 @@ export function openQuestionForm(prefill = null, existing = null) {
     q.displayData = displayData;
     q.tools = [...tools];
     q.result = result;
+    q.outcome = $('[data-f="outcome"]').value.trim();
     q.minutes = Math.max(0, Math.round(Number($('[data-f="minutes"]').value) || 0));
     await store.mutateDaily(d => {
       const i = d.questions.findIndex(x => x.id === q.id);

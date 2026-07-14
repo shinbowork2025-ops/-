@@ -5,7 +5,7 @@ import * as store from '../store.js';
 import { DAY_START, DAY_END, esc, minToLabel, nowMin, slotStartMin, slotIndexAt, fmtDateJa, todayStr } from '../util.js';
 import { confirmDialog } from '../ui.js';
 import { groupBlocks } from './schedule.js';
-import { openQuestionForm } from './questions.js';
+import { endCustomerTimer } from './questions.js';
 
 const BACKUP_REMIND_DAYS = 7;
 
@@ -111,13 +111,7 @@ export async function render(el) {
 
   // タイマー操作
   const endBtn = el.querySelector('[data-act="timer-end"]');
-  if (endBtn) endBtn.addEventListener('click', async () => {
-    const t = store.getDaily().activeTimer;
-    if (!t) return;
-    const minutes = Math.max(1, Math.round((Date.now() - new Date(t.startedAt).getTime()) / 60000));
-    await store.mutateDaily(d => { d.activeTimer = null; });
-    openQuestionForm({ at: t.startedAt, minutes });
-  });
+  if (endBtn) endBtn.addEventListener('click', () => endCustomerTimer());
   const discardBtn = el.querySelector('[data-act="timer-discard"]');
   if (discardBtn) discardBtn.addEventListener('click', async () => {
     if (await confirmDialog('対応タイマーを記録せずに破棄しますか?', { okLabel: '破棄する', danger: true })) {

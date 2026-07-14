@@ -34,7 +34,7 @@ function slotColor(slot, presets) {
 
 // ---- 画面状態(再描画をまたいで保持) ----
 let mode = 'view';               // 'view' | 'edit'
-let selectedTool = null;         // {type:'preset',id} | {type:'erase'} | {type:'free'}
+let selectedTool = null;         // {type:'preset',id} | {type:'erase'} | {type:'free', text}
 let undoStack = [];
 let redoStack = [];
 
@@ -110,11 +110,13 @@ function renderView(el, daily, presets) {
 
 function renderEdit(el, daily, presets) {
   const visible = presets.filter(p => p.visible);
+  const freeText = selectedTool && selectedTool.type === 'free' && selectedTool.text
+    ? `「${esc(selectedTool.text)}」` : '';
   const toolChips = visible.map(p => `
     <button class="chip tool" data-tool="preset" data-id="${p.id}">
       <span class="tool-color" style="background:${p.color}"></span>${esc(p.name)}
     </button>`).join('') + `
-    <button class="chip tool" data-tool="free">✎ 自由記入</button>
+    <button class="chip tool" data-tool="free">✎ 自由記入${freeText}</button>
     <button class="chip tool" data-tool="erase">🧽 消去</button>`;
 
   let rows = '';
@@ -137,8 +139,11 @@ function renderEdit(el, daily, presets) {
       <button class="btn small primary" data-act="done" style="margin-left:auto">完了</button>
     </div>
     <div class="paint-tools">${toolChips}</div>
-    <div class="muted" style="margin:4px 0 8px">項目を選んでマスをタップ、またはなぞって入力</div>
-    <div class="paint-grid">${rows}</div>`;
+    <div class="muted" style="margin:4px 0 8px">項目を選んでマスをタップ、またはなぞって入力。右のレーンか時刻列でスクロール</div>
+    <div class="paint-grid-wrap">
+      <div class="paint-grid">${rows}</div>
+      <div class="scroll-rail"><span class="rail-label">スクロール</span></div>
+    </div>`;
 
   const slots = daily.schedule;
 
@@ -169,7 +174,16 @@ function renderEdit(el, daily, presets) {
   el.querySelectorAll('.chip.tool').forEach(btn => {
     btn.addEventListener('click', () => {
       const t = btn.dataset.tool;
-      selectedTool = t === 'preset' ? { type: 'preset', id: btn.dataset.id } : { type: t };
+      if (t === 'free') {
+        // 選択時にテキストを決めておき、あとはプリセット同様になぞって塗れる
+        const prev = selectedTool && selectedTool.type === 'free' ? selectedTool.text : '';
+        const text = window.prompt('自由記入の内容', prev || '');
+        if (text === null || text.trim() === '') return;
+        selectedTool = { type: 'free', text: text.trim() };
+        btn.innerHTML = `✎ 自由記入「${esc(selectedTool.text)}」`;
+      } else {
+        selectedTool = t === 'preset' ? { type: 'preset', id: btn.dataset.id } : { type: t };
+      }
       selectToolBtn(btn);
     });
   });
@@ -201,7 +215,8 @@ function renderEdit(el, daily, presets) {
     if (!selectedTool) return undefined;
     if (selectedTool.type === 'preset') return { p: selectedTool.id };
     if (selectedTool.type === 'erase') return null;
-    return undefined; // free は個別処理
+    if (selectedTool.type === 'free') return { t: selectedTool.text };
+    return undefined;
   };
 
   grid.addEventListener('pointerdown', (e) => {
@@ -209,19 +224,6 @@ function renderEdit(el, daily, presets) {
     if (!cell) return;
     const i = Number(cell.dataset.slot);
     if (!selectedTool) { toast('先に上の項目を選んでください'); return; }
-
-    if (selectedTool.type === 'free') {
-      const cur = slots[i];
-      const text = window.prompt('内容を入力', cur && cur.t !== undefined ? cur.t : '');
-      if (text === null) return;
-      const v = text.trim() === '' ? null : { t: text.trim() };
-      snapshot = slots.slice();
-      if (applyToSlot(i, v)) {
-        undoStack.push(snapshot); redoStack = [];
-        paintCells(); commit();
-      }
-      return;
-    }
 
     painting = true;
     changed = false;
