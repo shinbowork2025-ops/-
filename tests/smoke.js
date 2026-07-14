@@ -24,6 +24,7 @@ function check(name, cond) {
   await page.waitForTimeout(800);
   check('ホームが表示される', await page.locator('#view .now-block').count() === 1);
   check('下部ナビが5項目', await page.locator('#bottomnav a').count() === 5);
+  check('中央に対応ボタンがある', await page.locator('#nav-cs').count() === 1);
 
   // --- TODO追加(FAB経由) ---
   await page.click('#fab-main');
@@ -48,6 +49,26 @@ function check(name, cond) {
   await cell.dispatchEvent('pointerup', { bubbles: true, pointerId: 1 });
   await page.waitForTimeout(400);
   check('マスにレジが入る', (await page.locator('.pg-cell[data-slot="9"]').textContent()).includes('レジ'));
+
+  // 自由記入をドラッグで塗り広げる(チップ選択時にテキスト入力)
+  page.once('dialog', d => d.accept('自由テスト'));
+  await page.click('.chip.tool[data-tool="free"]');
+  await page.waitForTimeout(200);
+  await page.locator('.pg-cell[data-slot="22"]').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(200);
+  const c20 = await page.locator('.pg-cell[data-slot="20"]').boundingBox();
+  const c22 = await page.locator('.pg-cell[data-slot="22"]').boundingBox();
+  await page.mouse.move(c20.x + c20.width / 2, c20.y + c20.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(c22.x + c22.width / 2, c22.y + c22.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  check('自由記入がドラッグで3マス塗れる',
+    (await page.locator('.pg-cell[data-slot="20"]').textContent()).includes('自由テスト') &&
+    (await page.locator('.pg-cell[data-slot="22"]').textContent()).includes('自由テスト'));
+
+  // スクロールレーンがある
+  check('スクロールレーンがある', await page.locator('.scroll-rail').count() === 1);
   await page.click('[data-act="done"]');
   await page.waitForTimeout(300);
   check('タイムラインにレジのブロック', (await page.locator('.timeline').textContent()).includes('レジ'));
@@ -95,23 +116,29 @@ function check(name, cond) {
   await page.fill('[data-f="placeAisle"]', '12');
   await page.fill('[data-f="content"]', '除草剤はどこにあるか');
   await page.fill('[data-f="destAisle"]', '18');
-  await page.click('[data-f="tools"] button:has-text("地図")');
+  await page.click('[data-f="tools"] button:has-text("DWH")');
+  await page.click('[data-f="outcomeCats"] button:has-text("在庫なし")');
+  await page.click('[data-f="outcomeCats"] button:has-text("取り寄せ")');
+  await page.fill('[data-f="outcome"]', '18番通路へ案内して解決');
   await page.fill('[data-f="minutes"]', '7');
   await page.click('[data-act="save"]');
   await page.waitForTimeout(300);
   check('質問記録が一覧に出る', (await page.locator('#view').textContent()).includes('除草剤はどこにあるか'));
+  check('結末が一覧に出る', (await page.locator('#view').textContent()).includes('18番通路へ案内して解決'));
+  check('結末カテゴリが一覧に出る', (await page.locator('#view').textContent()).includes('在庫なし・取り寄せ'));
 
-  // --- お客様対応タイマー ---
-  await page.click('#fab-main');
-  await page.click('[data-fab="customer"]');
+  // --- お客様対応タイマー(下部中央ボタン) ---
+  await page.click('#nav-cs');
   await page.waitForTimeout(400);
   check('ホームに対応中カード', await page.locator('.timer-card').count() === 1);
-  await page.click('[data-act="timer-end"]');
+  check('中央ボタンが対応中表示になる', await page.locator('#nav-cs.running').count() === 1);
+  await page.click('#nav-cs');
   await page.waitForTimeout(300);
   await page.fill('[data-f="content"]', 'タイマーテスト質問');
   await page.click('[data-act="save"]');
   await page.waitForTimeout(300);
   check('タイマー終了後に記録が保存される', await page.locator('.timer-card').count() === 0);
+  check('中央ボタンが通常表示に戻る', await page.locator('#nav-cs.running').count() === 0);
 
   // --- リロード後の永続化 ---
   await page.reload();
@@ -168,6 +195,8 @@ function check(name, cond) {
   const detail = await page.locator('.modal-sheet').textContent();
   check('集計詳細に時間帯別がある', detail.includes('時間帯別') && detail.includes('時台'));
   check('集計詳細に通路別がある', detail.includes('12番通路'));
+  check('集計詳細に結末別がある', detail.includes('結末別') && detail.includes('取り寄せ'));
+  check('未選択の結末はその他で集計', detail.includes('その他'));
 
   console.log('\n--- console/page errors ---');
   if (errors.length) errors.forEach(e => console.log(e));

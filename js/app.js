@@ -53,6 +53,34 @@ async function navigate() {
   closeFabMenu();
 }
 
+// ---- 下部中央の「お客様対応」ボタン ----
+
+function updateCsButton() {
+  const btn = document.getElementById('nav-cs');
+  const label = document.getElementById('nav-cs-label');
+  const daily = store.getDaily();
+  const t = daily && daily.activeTimer;
+  if (t) {
+    const min = Math.floor((Date.now() - new Date(t.startedAt).getTime()) / 60000);
+    btn.classList.add('running');
+    btn.childNodes[0].textContent = '⏱';
+    label.textContent = `終了 ${min}分`;
+  } else {
+    btn.classList.remove('running');
+    btn.childNodes[0].textContent = '🙋';
+    label.textContent = '対応開始';
+  }
+}
+
+function setupCsButton() {
+  document.getElementById('nav-cs').addEventListener('click', async () => {
+    await store.refreshDay();
+    if (store.getDaily().activeTimer) await questions.endCustomerTimer();
+    else await questions.startCustomerTimer();
+    updateCsButton();
+  });
+}
+
 // ---- FAB ----
 
 function closeFabMenu() {
@@ -94,7 +122,7 @@ async function main() {
   const r = await store.init();
   if (r.closedDate) toast(`前回(${r.closedDate})の記録を日次集計へ保存しました`, 3500);
 
-  store.onChange(() => renderCurrent({ preserveScroll: true }));
+  store.onChange(() => { updateCsButton(); renderCurrent({ preserveScroll: true }); });
   window.addEventListener('app:rerender', () => renderCurrent({ preserveScroll: true }));
   window.addEventListener('hashchange', navigate);
 
@@ -103,9 +131,10 @@ async function main() {
     if (document.visibilityState === 'visible') store.refreshDay();
   });
 
-  // ホームの時計・残り時間を1分ごとに更新
+  // ホームの時計・残り時間・対応ボタンの経過分を1分ごとに更新
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
+    updateCsButton();
     if (currentRoute === 'home' || currentRoute === 'schedule') {
       renderCurrent({ preserveScroll: true });
     }
@@ -115,6 +144,8 @@ async function main() {
   document.getElementById('btn-settings').addEventListener('click', () => { location.hash = '#/settings'; });
 
   setupFab();
+  setupCsButton();
+  updateCsButton();
   await navigate();
 
   // Service Worker登録(PWA・オフライン対応)
