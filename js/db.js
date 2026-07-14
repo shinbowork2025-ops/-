@@ -147,6 +147,8 @@ export function computeSummary(daily, presets) {
   const totalMin = qs.reduce((a, q) => a + (q.minutes || 0), 0);
   const byTool = {};
   for (const q of qs) for (const t of (q.tools || [])) byTool[t] = (byTool[t] || 0) + 1;
+  const byOutcome = {};
+  for (const q of qs) for (const c of (q.outcomeCategories || [])) byOutcome[c] = (byOutcome[c] || 0) + 1;
 
   const questionSummary = {
     total: qs.length,
@@ -160,6 +162,7 @@ export function computeSummary(daily, presets) {
     byDest: count(qs, q => placeKey(q.destType, q.destAisle, q.destFixed)),
     byDisplay: count(qs, q => q.displayData),
     byTool,
+    byOutcome,
     byHour: count(qs, q => `${new Date(q.at).getHours()}時台`),
   };
 

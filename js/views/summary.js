@@ -82,6 +82,7 @@ function openDetail(s) {
         <tr><td>平均所要時間</td><td class="num">${q.avgMin}分</td></tr>
         <tr><td>最長所要時間</td><td class="num">${q.maxMin}分</td></tr>
       </table>
+      <h3 class="mt12">結末別(複数選択はそれぞれ1件)</h3>${table(q.byOutcome || {})}
       <h3 class="mt12">時間帯別</h3>${table(q.byHour)}
       <h3 class="mt12">質問された場所</h3>${table(q.byPlace)}
       <h3 class="mt12">案内した場所</h3>${table(q.byDest)}

@@ -10,6 +10,10 @@ const PLACE_FIXED = ['レジ', 'サービスカウンター', '店頭', '屋外�
 const DEST_FIXED = ['同じ場所', 'レジ', 'サービスカウンター', '店頭', '屋外売場', '資材館', '担当者へ引継ぎ', '不明', 'その他'];
 const TOOLS = ['地図', 'スマホ', 'ハンディ', 'ストコン', 'DWH', '担当者', '上司'];
 const RESULTS = ['解決', '担当者へ引継ぎ', '未解決'];
+export const OUTCOME_CATEGORIES = [
+  '場所案内のみ', '商品説明・使い方の案内', '在庫なし', '入荷予定の案内',
+  '取り扱いなし', '取り寄せ', '他店在庫照会', '案内失敗', '担当者に移譲', 'その他',
+];
 const DISPLAY = [{ label: 'あり', value: 'あり' }, { label: 'なし', value: 'なし' }, { label: '未確認', value: '確認していない' }];
 
 function placeText(type, aisle, fixed) {
@@ -31,7 +35,7 @@ export async function render(el) {
           </div>
           <div class="q-content">${esc(q.content)}</div>
           <div class="muted">案内先: ${esc(placeText(q.destType, q.destAisle, q.destFixed))}</div>
-          ${q.outcome ? `<div class="muted">結末: ${esc(q.outcome)}</div>` : ''}
+          ${((q.outcomeCategories || []).length || q.outcome) ? `<div class="muted">結末: ${esc((q.outcomeCategories || []).join('・'))}${(q.outcomeCategories || []).length && q.outcome ? ' — ' : ''}${esc(q.outcome || '')}</div>` : ''}
         </div>`).join('')}
     </div>
     <div class="btn-row">
@@ -88,6 +92,7 @@ export function openQuestionForm(prefill = null, existing = null) {
     minutes: (prefill && prefill.minutes) || 0,
     tools: [],
     result: '解決',
+    outcomeCategories: [],
     outcome: '',
   };
   let dirty = false;
@@ -116,7 +121,10 @@ export function openQuestionForm(prefill = null, existing = null) {
     <label class="f-label">結果</label>
     <div data-f="result"></div>
 
-    <label class="f-label">結末(任意・自由記入)</label>
+    <label class="f-label">結末カテゴリ(複数選択可・未選択なら「その他」)</label>
+    <div data-f="outcomeCats"></div>
+
+    <label class="f-label">結末メモ(任意・自由記入・当日のみ)</label>
     <textarea data-f="outcome" rows="2" placeholder="例: 在庫なしのため取り寄せを案内した"></textarea>
 
     <label class="f-label">所要時間(分)${prefill && prefill.minutes ? '　※タイマー計測値' : ''}</label>
@@ -165,6 +173,8 @@ export function openQuestionForm(prefill = null, existing = null) {
   chipGroup($('[data-f="display"]'), DISPLAY, displayData, v => { displayData = v; dirty = true; });
   chipGroupMulti($('[data-f="tools"]'), TOOLS.map(x => ({ label: x, value: x })), tools, () => { dirty = true; });
   chipGroup($('[data-f="result"]'), RESULTS.map(x => ({ label: x, value: x })), result, v => { result = v; dirty = true; });
+  const outcomeCats = new Set(q.outcomeCategories || []);
+  chipGroupMulti($('[data-f="outcomeCats"]'), OUTCOME_CATEGORIES.map(x => ({ label: x, value: x })), outcomeCats, () => { dirty = true; });
 
   m.el.querySelectorAll('textarea, input').forEach(i => i.addEventListener('input', () => { dirty = true; }));
 
@@ -183,6 +193,7 @@ export function openQuestionForm(prefill = null, existing = null) {
     q.displayData = displayData;
     q.tools = [...tools];
     q.result = result;
+    q.outcomeCategories = outcomeCats.size ? [...outcomeCats] : ['その他'];
     q.outcome = $('[data-f="outcome"]').value.trim();
     q.minutes = Math.max(0, Math.round(Number($('[data-f="minutes"]').value) || 0));
     await store.mutateDaily(d => {

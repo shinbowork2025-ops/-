@@ -117,12 +117,15 @@ function check(name, cond) {
   await page.fill('[data-f="content"]', '除草剤はどこにあるか');
   await page.fill('[data-f="destAisle"]', '18');
   await page.click('[data-f="tools"] button:has-text("DWH")');
+  await page.click('[data-f="outcomeCats"] button:has-text("在庫なし")');
+  await page.click('[data-f="outcomeCats"] button:has-text("取り寄せ")');
   await page.fill('[data-f="outcome"]', '18番通路へ案内して解決');
   await page.fill('[data-f="minutes"]', '7');
   await page.click('[data-act="save"]');
   await page.waitForTimeout(300);
   check('質問記録が一覧に出る', (await page.locator('#view').textContent()).includes('除草剤はどこにあるか'));
   check('結末が一覧に出る', (await page.locator('#view').textContent()).includes('18番通路へ案内して解決'));
+  check('結末カテゴリが一覧に出る', (await page.locator('#view').textContent()).includes('在庫なし・取り寄せ'));
 
   // --- お客様対応タイマー(下部中央ボタン) ---
   await page.click('#nav-cs');
@@ -192,6 +195,8 @@ function check(name, cond) {
   const detail = await page.locator('.modal-sheet').textContent();
   check('集計詳細に時間帯別がある', detail.includes('時間帯別') && detail.includes('時台'));
   check('集計詳細に通路別がある', detail.includes('12番通路'));
+  check('集計詳細に結末別がある', detail.includes('結末別') && detail.includes('取り寄せ'));
+  check('未選択の結末はその他で集計', detail.includes('その他'));
 
   console.log('\n--- console/page errors ---');
   if (errors.length) errors.forEach(e => console.log(e));
